@@ -72,6 +72,15 @@ input { font: inherit; }
   cursor: not-allowed;
 }
 
+.remote-content-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  color: #294236;
+}
+
+.remote-content-toggle:has(input:disabled) { color: #64736a; }
+
 .preview-sheet {
   width: min(100%, 42rem);
   aspect-ratio: 148 / 210;

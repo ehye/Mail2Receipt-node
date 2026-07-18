@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { ParsedMessage } from './mail/types';
 import type { PreparedPreview } from './preview/policy';
@@ -7,10 +7,14 @@ const mocks = vi.hoisted(() => ({
   buildPreviewDocument: vi.fn(),
   parseEml: vi.fn(),
   preparePreview: vi.fn(),
+  prepareRemoteStylesheets: vi.fn(),
 }));
 
 vi.mock('./mail/parse', () => ({ parseEml: mocks.parseEml }));
-vi.mock('./preview/policy', () => ({ preparePreview: mocks.preparePreview }));
+vi.mock('./preview/policy', () => ({
+  preparePreview: mocks.preparePreview,
+  prepareRemoteStylesheets: mocks.prepareRemoteStylesheets,
+}));
 vi.mock('./preview/preview-document', () => ({ buildPreviewDocument: mocks.buildPreviewDocument }));
 
 import { mountApp } from './app';
@@ -33,6 +37,7 @@ function select(root: HTMLDivElement, selected: File): void {
 async function flush(): Promise<void> {
   await Promise.resolve();
   await Promise.resolve();
+  await Promise.resolve();
 }
 
 function dispatchFrameLoad(frame: HTMLIFrameElement, source: string): void {
@@ -50,29 +55,37 @@ describe('mountApp', () => {
   let root: HTMLDivElement;
 
   beforeEach(() => {
+    vi.stubGlobal('URL', { createObjectURL: undefined, revokeObjectURL: URL.revokeObjectURL });
     root = document.createElement('div');
     document.body.replaceChildren(root);
     mocks.parseEml.mockReset();
     mocks.preparePreview.mockReset();
+    mocks.prepareRemoteStylesheets.mockReset().mockResolvedValue(undefined);
     mocks.buildPreviewDocument.mockReset();
-    mocks.preparePreview.mockReturnValue({ html: '<p>prepared</p>', remoteImageCount: 0 } satisfies PreparedPreview);
-    mocks.buildPreviewDocument.mockImplementation((_preview: PreparedPreview, allowRemoteImages: boolean) =>
-      allowRemoteImages
+    mocks.preparePreview.mockReturnValue({ html: '<p>prepared</p>', remoteResourceCount: 0 } satisfies PreparedPreview);
+    mocks.buildPreviewDocument.mockImplementation((_preview: PreparedPreview, allowRemoteContent: boolean) =>
+      allowRemoteContent
         ? '<!doctype html><html><head></head><body><p>remote</p></body></html>'
         : '<!doctype html><html><head></head><body><p>blocked</p></body></html>',
     );
-    vi.stubGlobal('confirm', vi.fn(() => true));
   });
+
+  afterEach(() => vi.unstubAllGlobals());
 
   it('creates a private review shell with disabled actions', () => {
     mountApp(root);
 
     const input = root.querySelector<HTMLInputElement>('input[type="file"]');
-    const remote = root.querySelector<HTMLButtonElement>('button[name="load-remote-images"]');
+    const remote = root.querySelector<HTMLInputElement>('input[name="load-remote-content"]');
     const print = root.querySelector<HTMLButtonElement>('button[name="print"]');
     const status = root.querySelector<HTMLElement>('[role="status"]');
     expect(input?.getAttribute('accept')).toBe('.eml,message/rfc822');
+    expect(remote?.type).toBe('checkbox');
+    expect(remote?.checked).toBe(false);
     expect(remote?.disabled).toBe(true);
+    expect(root.textContent).toContain(
+      'Direct and stylesheet-derived requests use no-referrer.',
+    );
     expect(print?.disabled).toBe(true);
     expect(status?.getAttribute('aria-live')).toBe('polite');
 
@@ -125,14 +138,18 @@ describe('mountApp', () => {
     expect(root.textContent).not.toContain('private-email.eml');
   });
 
-  it('requires fresh remote consent for each selected file', async () => {
-    mocks.preparePreview.mockReturnValue({ html: '<p>prepared</p>', remoteImageCount: 1 } satisfies PreparedPreview);
+  it('keeps remote content consent through later selections', async () => {
+    const confirm = vi.spyOn(window, 'confirm');
+    mocks.preparePreview
+      .mockReturnValueOnce({ html: '<p>first</p>', remoteResourceCount: 1 } satisfies PreparedPreview)
+      .mockReturnValueOnce({ html: '<p>local</p>', remoteResourceCount: 0 } satisfies PreparedPreview)
+      .mockReturnValueOnce({ html: '<p>later</p>', remoteResourceCount: 1 } satisfies PreparedPreview);
     mocks.parseEml.mockResolvedValue(message);
     mountApp(root);
 
     select(root, file());
     await flush();
-    const remote = root.querySelector<HTMLButtonElement>('button[name="load-remote-images"]')!;
+    const remote = root.querySelector<HTMLInputElement>('input[name="load-remote-content"]')!;
     const print = root.querySelector<HTMLButtonElement>('button[name="print"]')!;
     const frame = root.querySelector<HTMLIFrameElement>('iframe')!;
     expect(remote.disabled).toBe(false);
@@ -140,30 +157,63 @@ describe('mountApp', () => {
 
     dispatchFrameLoad(frame, frame.srcdoc);
     expect(print.disabled).toBe(false);
-    remote.click();
-    expect(window.confirm).toHaveBeenCalledWith(expect.stringContaining('IP address'));
+    remote.checked = true;
+    remote.dispatchEvent(new Event('change'));
+    await flush();
     expect(frame.srcdoc).toContain('<p>remote</p>');
     expect(print.disabled).toBe(true);
 
     select(root, file());
+    await flush();
+    expect(remote.checked).toBe(true);
     expect(remote.disabled).toBe(true);
-    expect(print.disabled).toBe(true);
+    expect(mocks.buildPreviewDocument).toHaveBeenLastCalledWith(expect.anything(), true);
+
+    select(root, file());
+    await flush();
+    expect(remote.checked).toBe(true);
+    expect(remote.disabled).toBe(false);
+    expect(mocks.buildPreviewDocument).toHaveBeenLastCalledWith(expect.anything(), true);
+    expect(frame.srcdoc).toContain('<p>remote</p>');
+    expect(confirm).not.toHaveBeenCalled();
+  });
+
+  it('rebuilds the active preview when remote content is unchecked', async () => {
+    mocks.preparePreview.mockReturnValue({ html: '<p>prepared</p>', remoteResourceCount: 1 } satisfies PreparedPreview);
+    mocks.parseEml.mockResolvedValue(message);
+    mountApp(root);
+
+    select(root, file());
+    await flush();
+    const remote = root.querySelector<HTMLInputElement>('input[name="load-remote-content"]')!;
+    const print = root.querySelector<HTMLButtonElement>('button[name="print"]')!;
+    const frame = root.querySelector<HTMLIFrameElement>('iframe')!;
+    remote.checked = true;
+    remote.dispatchEvent(new Event('change'));
+    await flush();
+    expect(frame.srcdoc).toContain('<p>remote</p>');
+
+    remote.checked = false;
+    remote.dispatchEvent(new Event('change'));
     await flush();
     expect(frame.srcdoc).toContain('<p>blocked</p>');
+    expect(print.disabled).toBe(true);
   });
 
   it('ignores a late blocked-document load after remote replacement', async () => {
-    mocks.preparePreview.mockReturnValue({ html: '<p>prepared</p>', remoteImageCount: 1 } satisfies PreparedPreview);
+    mocks.preparePreview.mockReturnValue({ html: '<p>prepared</p>', remoteResourceCount: 1 } satisfies PreparedPreview);
     mocks.parseEml.mockResolvedValue(message);
     mountApp(root);
     select(root, file());
     await flush();
 
     const frame = root.querySelector<HTMLIFrameElement>('iframe')!;
-    const remote = root.querySelector<HTMLButtonElement>('button[name="load-remote-images"]')!;
+    const remote = root.querySelector<HTMLInputElement>('input[name="load-remote-content"]')!;
     const print = root.querySelector<HTMLButtonElement>('button[name="print"]')!;
     const blockedDocument = frame.srcdoc;
-    remote.click();
+    remote.checked = true;
+    remote.dispatchEvent(new Event('change'));
+    await flush();
     const remoteDocument = frame.srcdoc;
 
     dispatchFrameLoad(frame, blockedDocument);

@@ -1,26 +1,25 @@
 import { parseEml } from './mail/parse';
-import { preparePreview, type PreparedPreview } from './preview/policy';
+import { preparePreview, prepareRemoteStylesheets, type PreparedPreview } from './preview/policy';
 import { buildPreviewDocument } from './preview/preview-document';
 
 type ReviewState = {
   session: number;
   preview?: PreparedPreview;
-  remoteAllowed: boolean;
+  remoteContentAllowed: boolean;
   frameReady: boolean;
   nextDocumentToken: number;
   activeDocumentToken: number;
   activeDocumentSession: number;
+  activeDocumentUrl?: string;
 };
 
 const parsingError = 'Unable to prepare this email for preview.';
-const remoteWarning =
-  'Loading remote images lets image hosts receive your IP address and request timing. Load remote images for this email?';
 const documentTokenName = 'mail2receipt-document-token';
 
 export function mountApp(root: HTMLDivElement): void {
   const state: ReviewState = {
     session: 0,
-    remoteAllowed: false,
+    remoteContentAllowed: false,
     frameReady: false,
     nextDocumentToken: 0,
     activeDocumentToken: 0,
@@ -33,7 +32,8 @@ export function mountApp(root: HTMLDivElement): void {
   const dropTarget = element('div', 'drop-target');
   const status = element('p', 'review-status');
   const controls = element('div', 'review-controls');
-  const remoteButton = document.createElement('button');
+  const remoteContent = document.createElement('input');
+  const remoteContentLabel = document.createElement('label');
   const printButton = document.createElement('button');
   const sheet = element('div', 'preview-sheet');
   const frame = document.createElement('iframe');
@@ -50,10 +50,14 @@ export function mountApp(root: HTMLDivElement): void {
   status.setAttribute('role', 'status');
   status.setAttribute('aria-live', 'polite');
   status.textContent = 'Choose one HTML email to begin.';
-  remoteButton.type = 'button';
-  remoteButton.name = 'load-remote-images';
-  remoteButton.textContent = 'Load remote images';
-  remoteButton.disabled = true;
+  remoteContent.type = 'checkbox';
+  remoteContent.name = 'load-remote-content';
+  remoteContent.disabled = true;
+  remoteContentLabel.className = 'remote-content-toggle';
+  remoteContentLabel.append(
+    remoteContent,
+    ' Load remote content (remote hosts can receive your IP address and request timing. Direct and stylesheet-derived requests use no-referrer.)',
+  );
   printButton.type = 'button';
   printButton.name = 'print';
   printButton.textContent = 'Print';
@@ -62,7 +66,7 @@ export function mountApp(root: HTMLDivElement): void {
   frame.setAttribute('sandbox', 'allow-same-origin allow-modals');
   frame.setAttribute('referrerpolicy', 'no-referrer');
 
-  controls.append(remoteButton, printButton);
+  controls.append(remoteContentLabel, printButton);
   sheet.append(frame);
   shell.append(heading, picker, dropTarget, status, controls, sheet);
   root.replaceChildren(shell);
@@ -103,23 +107,14 @@ export function mountApp(root: HTMLDivElement): void {
     printButton.disabled = false;
   });
 
-  remoteButton.addEventListener('click', () => {
+  remoteContent.addEventListener('change', () => {
+    state.remoteContentAllowed = remoteContent.checked;
     const preview = state.preview;
-    const session = state.session;
 
-    if (!preview || preview.remoteImageCount === 0 || state.remoteAllowed || !window.confirm(remoteWarning)) {
-      return;
+    if (preview) {
+      printButton.disabled = true;
+      void renderPreview(preview, state.session);
     }
-
-    if (state.session !== session) {
-      return;
-    }
-
-    state.remoteAllowed = true;
-    state.frameReady = false;
-    remoteButton.disabled = true;
-    printButton.disabled = true;
-    assignFrameDocument(buildPreviewDocument(preview, true));
   });
 
   printButton.addEventListener('click', () => {
@@ -138,10 +133,9 @@ export function mountApp(root: HTMLDivElement): void {
   function selectFile(file: File): void {
     const session = ++state.session;
     delete state.preview;
-    state.remoteAllowed = false;
     state.frameReady = false;
     assignFrameDocument('');
-    remoteButton.disabled = true;
+    remoteContent.disabled = true;
     printButton.disabled = true;
     status.textContent = 'Preparing email preview.';
 
@@ -164,8 +158,11 @@ export function mountApp(root: HTMLDivElement): void {
 
       state.preview = preview;
       state.frameReady = false;
-      assignFrameDocument(buildPreviewDocument(preview, false));
-      remoteButton.disabled = preview.remoteImageCount === 0;
+      await renderPreview(preview, session);
+      if (state.session !== session || state.preview !== preview) {
+        return;
+      }
+      remoteContent.disabled = preview.remoteResourceCount === 0;
       printButton.disabled = true;
       status.textContent = 'Preview ready.';
     } catch {
@@ -174,12 +171,21 @@ export function mountApp(root: HTMLDivElement): void {
       }
 
       delete state.preview;
-      state.remoteAllowed = false;
       state.frameReady = false;
       assignFrameDocument('');
-      remoteButton.disabled = true;
+      remoteContent.disabled = true;
       printButton.disabled = true;
       status.textContent = parsingError;
+    }
+  }
+
+  async function renderPreview(preview: PreparedPreview, session: number): Promise<void> {
+    if (state.remoteContentAllowed) {
+      await prepareRemoteStylesheets(preview);
+    }
+
+    if (state.session === session && state.preview === preview) {
+      assignFrameDocument(buildPreviewDocument(preview, state.remoteContentAllowed));
     }
   }
 
@@ -188,9 +194,21 @@ export function mountApp(root: HTMLDivElement): void {
     state.activeDocumentToken = token;
     state.activeDocumentSession = state.session;
     state.frameReady = false;
-    frame.srcdoc = source
-      ? source.replace('<head>', `<head><meta name="${documentTokenName}" content="${token}">`)
-      : '';
+    const document = source ? source.replace('<head>', `<head><meta name="${documentTokenName}" content="${token}">`) : '';
+
+    if (state.activeDocumentUrl) {
+      URL.revokeObjectURL(state.activeDocumentUrl);
+      delete state.activeDocumentUrl;
+    }
+
+    if (document && typeof URL.createObjectURL === 'function') {
+      state.activeDocumentUrl = URL.createObjectURL(new Blob([document], { type: 'text/html' }));
+      frame.removeAttribute('srcdoc');
+      frame.src = state.activeDocumentUrl;
+      return;
+    }
+
+    frame.srcdoc = document;
   }
 }
 

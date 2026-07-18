@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'none'; connect-src 'none'; worker-src 'self'; frame-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src data: https:; font-src https:; connect-src https:; worker-src 'self'; frame-src 'self' blob:; object-src 'none'; base-uri 'none'; form-action 'none'" />
     <title>Email print preview</title>
   </head>
   <body><div id="app"></div><script type="module" src="/src/main.ts"></script></body>
