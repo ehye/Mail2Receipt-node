@@ -112,7 +112,9 @@ function externalHttpRequests(page: Page): Request[] {
 }
 
 async function uploadAndWaitForPreview(page: Page, eml: string, text: string): Promise<FrameLocator> {
-  await page.locator('input[type="file"]').setInputFiles(emailFile(eml));
+  await page
+    .locator('label[aria-label="Choose or drop an HTML email"] input[name="email-file"]')
+    .setInputFiles(emailFile(eml));
 
   const frame = page.frameLocator('iframe');
   await expect(frame.locator('body')).toContainText(text);
@@ -270,7 +272,9 @@ test('remote content consent blocks HTTP stylesheet font, image, and import depe
   await page.route(httpFontUrl, (route) => route.fulfill({ contentType: 'font/woff2', body: Buffer.from('fixture-font') }));
   await page.route(httpStylesheetImportUrl, (route) => route.fulfill({ contentType: 'text/css', body: '' }));
 
-  await page.locator('input[type="file"]').setInputFiles(emailFile(stylesheetHttpDependenciesEmail));
+  await page
+    .locator('label[aria-label="Choose or drop an HTML email"] input[name="email-file"]')
+    .setInputFiles(emailFile(stylesheetHttpDependenciesEmail));
   const frame = page.frameLocator('iframe');
   await expect(frame.locator('body')).toContainText('Stylesheet HTTP dependency fixture');
 
@@ -373,8 +377,10 @@ test('preserves a source body font family', async ({ page }) => {
 test('renders hostile HTML in a sandboxed iframe without active or navigational content', async ({ page }) => {
   await page.goto('/');
   await expect(page.getByRole('button', { name: 'Print' })).toBeDisabled();
+  await expect(page.locator('label[aria-label="Choose or drop an HTML email"]')).toBeVisible();
 
   const frame = await uploadAndWaitForPreview(page, hostileEmail, 'Hostile fixture');
+  await expect(page.locator('label[aria-label="Choose or drop an HTML email"]')).toBeHidden();
   const documentHtml = await frame.locator('html').evaluate((element) => element.outerHTML);
 
   await expect(page.locator('iframe')).toHaveAttribute('sandbox', 'allow-same-origin allow-modals');
@@ -388,7 +394,9 @@ test('renders hostile HTML in a sandboxed iframe without active or navigational 
 
 test('reports text-only input with generic copy that excludes email content', async ({ page }) => {
   await page.goto('/');
-  await page.locator('input[type="file"]').setInputFiles(emailFile(textOnlyEmail));
+  await page
+    .locator('label[aria-label="Choose or drop an HTML email"] input[name="email-file"]')
+    .setInputFiles(emailFile(textOnlyEmail));
 
   await expect(page.getByRole('status')).toHaveText('Unable to prepare this email for preview.');
   await expect(page.locator('body')).not.toContainText(privateText);
