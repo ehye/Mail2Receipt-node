@@ -135,6 +135,47 @@ test('uses the preview sheet as the upload overlay', async ({ page }) => {
   await expect(input).toHaveCSS('overflow', 'clip');
 });
 
+test('uses a desktop control rail and stacks the workspace on narrow screens', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.goto('/');
+
+  const title = page.locator('.review-title');
+  const controls = page.locator('.review-controls');
+  const status = page.locator('.review-status');
+  const sheet = page.locator('.preview-sheet');
+  const desktopTitle = await title.boundingBox();
+  const desktopControls = await controls.boundingBox();
+  const desktopStatus = await status.boundingBox();
+  const desktopSheet = await sheet.boundingBox();
+
+  expect(desktopTitle).not.toBeNull();
+  expect(desktopControls).not.toBeNull();
+  expect(desktopStatus).not.toBeNull();
+  expect(desktopSheet).not.toBeNull();
+  expect(desktopSheet!.x).toBeGreaterThan(desktopControls!.x);
+  expect(desktopTitle!.y).toBe(desktopSheet!.y);
+  expect(desktopControls!.y).toBeGreaterThan(desktopTitle!.y);
+  expect(desktopStatus!.y).toBeGreaterThan(desktopControls!.y);
+  await expect(controls).toHaveCSS('flex-direction', 'column');
+
+  await page.setViewportSize({ width: 600, height: 900 });
+
+  const mobileTitle = await title.boundingBox();
+  const mobileControls = await controls.boundingBox();
+  const mobileStatus = await status.boundingBox();
+  const mobileSheet = await sheet.boundingBox();
+
+  expect(mobileTitle).not.toBeNull();
+  expect(mobileControls).not.toBeNull();
+  expect(mobileStatus).not.toBeNull();
+  expect(mobileSheet).not.toBeNull();
+  expect(mobileControls!.y).toBeGreaterThan(mobileTitle!.y);
+  expect(mobileStatus!.y).toBeGreaterThan(mobileControls!.y);
+  expect(mobileSheet!.y).toBeGreaterThan(mobileStatus!.y);
+  expect(mobileSheet!.x).toBe(8);
+  await expect(controls).toHaveCSS('flex-direction', 'row');
+});
+
 test('remote content fetches each stylesheet once and keeps all approved requests private', async ({ page }) => {
   await page.goto('/');
   const requests = externalHttpRequests(page);
