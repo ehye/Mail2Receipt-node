@@ -158,15 +158,18 @@ test('uses a desktop control rail and stacks the workspace on narrow screens', a
   expect(desktopTitle!.y).toBe(desktopSheet!.y);
   expect(desktopControls!.y).toBeGreaterThan(desktopTitle!.y);
   expect(desktopStatus!.y).toBeGreaterThan(desktopControls!.y);
+  expect(desktopSheet!.width / desktopSheet!.height).toBeCloseTo(148 / 210, 3);
   await expect(controls).toHaveCSS('flex-direction', 'column');
 
   await page.setViewportSize({ width: 600, height: 900 });
 
+  const mobileShell = await page.locator('.review-shell').boundingBox();
   const mobileTitle = await title.boundingBox();
   const mobileControls = await controls.boundingBox();
   const mobileStatus = await status.boundingBox();
   const mobileSheet = await sheet.boundingBox();
 
+  expect(mobileShell).not.toBeNull();
   expect(mobileTitle).not.toBeNull();
   expect(mobileControls).not.toBeNull();
   expect(mobileStatus).not.toBeNull();
@@ -174,14 +177,26 @@ test('uses a desktop control rail and stacks the workspace on narrow screens', a
   expect(mobileControls!.y).toBeGreaterThan(mobileTitle!.y);
   expect(mobileStatus!.y).toBeGreaterThan(mobileControls!.y);
   expect(mobileSheet!.y).toBeGreaterThan(mobileStatus!.y);
-  expect(mobileSheet!.x).toBe(8);
+  expect(mobileSheet!.x).toBe(mobileShell!.x);
+  expect(mobileSheet!.width).toBe(mobileShell!.width);
+  expect(mobileSheet!.width / mobileSheet!.height).toBeCloseTo(148 / 210, 3);
   await expect(controls).toHaveCSS('flex-direction', 'row');
+});
+
+test('caps the desktop preview sheet at its configured CSS width on high-resolution screens', async ({ page }) => {
+  await page.setViewportSize({ width: 3840, height: 2160 });
+  await page.goto('/');
+
+  const sheet = await page.locator('.preview-sheet').boundingBox();
+
+  expect(sheet).not.toBeNull();
+  expect(sheet!.width).toBeCloseTo((187 * 96) / 25.4, 1);
+  expect(sheet!.width / sheet!.height).toBeCloseTo(148 / 210, 3);
 });
 
 test('remote content fetches each stylesheet once and keeps all approved requests private', async ({ page }) => {
   await page.goto('/');
   const requests = externalHttpRequests(page);
-  await expect(page.getByText('Direct and stylesheet-derived requests use no-referrer.')).toBeVisible();
   let dialogMessage: string | undefined;
   page.on('dialog', (dialog) => {
     dialogMessage = dialog.message();

@@ -88,9 +88,6 @@ describe('mountApp', () => {
     expect(remote?.type).toBe('checkbox');
     expect(remote?.checked).toBe(false);
     expect(remote?.disabled).toBe(true);
-    expect(root.textContent).toContain(
-      'Direct and stylesheet-derived requests use no-referrer.',
-    );
     expect(print?.disabled).toBe(true);
     expect(status?.getAttribute('aria-live')).toBe('polite');
 

@@ -54,7 +54,7 @@ export function mountApp(root: HTMLDivElement): void {
   remoteContentLabel.className = 'remote-content-toggle';
   remoteContentLabel.append(
     remoteContent,
-    ' Load remote content (remote hosts can receive your IP address and request timing. Direct and stylesheet-derived requests use no-referrer.)',
+    ' Load remote content',
   );
   printButton.type = 'button';
   printButton.name = 'print';
@@ -163,7 +163,7 @@ export function mountApp(root: HTMLDivElement): void {
       }
       remoteContent.disabled = preview.remoteResourceCount === 0;
       printButton.disabled = true;
-      status.textContent = 'Preview ready.';
+      status.textContent = '';
     } catch {
       if (state.session !== session) {
         return;

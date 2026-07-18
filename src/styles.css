@@ -93,7 +93,7 @@ input { font: inherit; }
 .preview-sheet {
   grid-area: preview;
   position: relative;
-  width: min(100%, 55rem);
+  width: min(100%, 187mm);
   aspect-ratio: 148 / 210;
   margin: 0;
   overflow: hidden;
