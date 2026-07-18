@@ -27,9 +27,8 @@ export function mountApp(root: HTMLDivElement): void {
   };
   const shell = element('main', 'review-shell');
   const heading = element('h1', 'review-title');
-  const picker = document.createElement('label');
   const input = document.createElement('input');
-  const dropTarget = element('div', 'drop-target');
+  const uploadOverlay = document.createElement('label');
   const status = element('p', 'review-status');
   const controls = element('div', 'review-controls');
   const remoteContent = document.createElement('input');
@@ -39,14 +38,13 @@ export function mountApp(root: HTMLDivElement): void {
   const frame = document.createElement('iframe');
 
   heading.textContent = 'Email print preview';
-  picker.className = 'file-picker';
   input.type = 'file';
   input.accept = '.eml,message/rfc822';
   input.name = 'email-file';
-  picker.htmlFor = input.id = 'email-file';
-  picker.append('Choose email', input);
-  dropTarget.textContent = 'Drop an email file here';
-  dropTarget.setAttribute('aria-label', 'Drop email file');
+  uploadOverlay.className = 'preview-upload';
+  uploadOverlay.htmlFor = input.id = 'email-file';
+  uploadOverlay.setAttribute('aria-label', 'Choose or drop an HTML email');
+  uploadOverlay.append('Choose or drop an HTML email', input);
   status.setAttribute('role', 'status');
   status.setAttribute('aria-live', 'polite');
   status.textContent = 'Choose one HTML email to begin.';
@@ -67,8 +65,8 @@ export function mountApp(root: HTMLDivElement): void {
   frame.setAttribute('referrerpolicy', 'no-referrer');
 
   controls.append(remoteContentLabel, printButton);
-  sheet.append(frame);
-  shell.append(heading, picker, dropTarget, status, controls, sheet);
+  sheet.append(uploadOverlay, frame);
+  shell.append(heading, controls, status, sheet);
   root.replaceChildren(shell);
 
   input.addEventListener('change', () => {
@@ -81,10 +79,10 @@ export function mountApp(root: HTMLDivElement): void {
   });
 
   for (const eventName of ['dragenter', 'dragover', 'dragleave', 'drop']) {
-    dropTarget.addEventListener(eventName, (event) => event.preventDefault());
+    uploadOverlay.addEventListener(eventName, (event) => event.preventDefault());
   }
 
-  dropTarget.addEventListener('drop', (event) => {
+  uploadOverlay.addEventListener('drop', (event) => {
     const file = event.dataTransfer?.files.item(0);
 
     if (file) {
@@ -132,6 +130,7 @@ export function mountApp(root: HTMLDivElement): void {
 
   function selectFile(file: File): void {
     const session = ++state.session;
+    uploadOverlay.hidden = true;
     delete state.preview;
     state.frameReady = false;
     assignFrameDocument('');

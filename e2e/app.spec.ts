@@ -112,7 +112,7 @@ function externalHttpRequests(page: Page): Request[] {
 }
 
 async function uploadAndWaitForPreview(page: Page, eml: string, text: string): Promise<FrameLocator> {
-  await page.getByLabel('Choose email').setInputFiles(emailFile(eml));
+  await page.locator('input[type="file"]').setInputFiles(emailFile(eml));
 
   const frame = page.frameLocator('iframe');
   await expect(frame.locator('body')).toContainText(text);
@@ -215,7 +215,7 @@ test('remote content consent blocks HTTP stylesheet font, image, and import depe
   await page.route(httpFontUrl, (route) => route.fulfill({ contentType: 'font/woff2', body: Buffer.from('fixture-font') }));
   await page.route(httpStylesheetImportUrl, (route) => route.fulfill({ contentType: 'text/css', body: '' }));
 
-  await page.getByLabel('Choose email').setInputFiles(emailFile(stylesheetHttpDependenciesEmail));
+  await page.locator('input[type="file"]').setInputFiles(emailFile(stylesheetHttpDependenciesEmail));
   const frame = page.frameLocator('iframe');
   await expect(frame.locator('body')).toContainText('Stylesheet HTTP dependency fixture');
 
@@ -333,7 +333,7 @@ test('renders hostile HTML in a sandboxed iframe without active or navigational 
 
 test('reports text-only input with generic copy that excludes email content', async ({ page }) => {
   await page.goto('/');
-  await page.getByLabel('Choose email').setInputFiles(emailFile(textOnlyEmail));
+  await page.locator('input[type="file"]').setInputFiles(emailFile(textOnlyEmail));
 
   await expect(page.getByRole('status')).toHaveText('Unable to prepare this email for preview.');
   await expect(page.locator('body')).not.toContainText(privateText);
