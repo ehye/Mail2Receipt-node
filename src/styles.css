@@ -26,19 +26,17 @@ input { font: inherit; }
   letter-spacing: -0.04em;
 }
 
-.file-picker,
-.drop-target {
+.preview-upload {
   display: grid;
   place-items: center;
-  min-height: 4.5rem;
-  border: 1px dashed #74867c;
-  border-radius: 0.65rem;
-  background: #f8faf8;
-  color: #294236;
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  color: #53665b;
   cursor: pointer;
 }
 
-.file-picker input {
+.preview-upload input {
   position: absolute;
   inline-size: 1px;
   block-size: 1px;
@@ -47,9 +45,7 @@ input { font: inherit; }
   white-space: nowrap;
 }
 
-.file-picker:focus-within { outline: 3px solid #8ab19a; outline-offset: 3px; }
-
-.drop-target { color: #53665b; }
+.preview-upload:focus-within { outline: 3px solid #8ab19a; outline-offset: -3px; }
 
 .review-status { min-height: 1.5rem; margin: 0; color: #3d5046; }
 
@@ -82,6 +78,7 @@ input { font: inherit; }
 .remote-content-toggle:has(input:disabled) { color: #64736a; }
 
 .preview-sheet {
+  position: relative;
   width: min(100%, 42rem);
   aspect-ratio: 148 / 210;
   margin: 0 auto;

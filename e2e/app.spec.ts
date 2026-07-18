@@ -121,6 +121,20 @@ async function uploadAndWaitForPreview(page: Page, eml: string, text: string): P
   return frame;
 }
 
+test('uses the preview sheet as the upload overlay', async ({ page }) => {
+  await page.goto('/');
+
+  const overlay = page.locator('.preview-upload');
+  const input = overlay.locator('input[type="file"]');
+
+  await expect(overlay).toHaveCSS('position', 'absolute');
+  await expect(overlay).toHaveCSS('z-index', '1');
+  await expect(input).toHaveCSS('position', 'absolute');
+  await expect(input).toHaveCSS('width', '1px');
+  await expect(input).toHaveCSS('height', '1px');
+  await expect(input).toHaveCSS('overflow', 'clip');
+});
+
 test('remote content fetches each stylesheet once and keeps all approved requests private', async ({ page }) => {
   await page.goto('/');
   const requests = externalHttpRequests(page);
