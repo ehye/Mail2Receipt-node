@@ -76,16 +76,18 @@ describe('mountApp', () => {
     mountApp(root);
 
     const input = root.querySelector<HTMLInputElement>('input[type="file"]');
+    const uploadOverlay = root.querySelector<HTMLElement>('.preview-upload');
     const remote = root.querySelector<HTMLInputElement>('input[name="load-remote-content"]');
     const print = root.querySelector<HTMLButtonElement>('button[name="print"]');
     const status = root.querySelector<HTMLElement>('[role="status"]');
     expect(input?.getAttribute('accept')).toBe('.eml,message/rfc822');
+    expect(uploadOverlay?.getAttribute('aria-label')).toBe('Choose or drop an HTML email');
+    expect(input?.closest('.preview-upload')).toBe(uploadOverlay);
+    expect(root.querySelector('.drop-target')).toBeNull();
+    expect(root.querySelector('.review-shell > .file-picker')).toBeNull();
     expect(remote?.type).toBe('checkbox');
     expect(remote?.checked).toBe(false);
     expect(remote?.disabled).toBe(true);
-    expect(root.textContent).toContain(
-      'Direct and stylesheet-derived requests use no-referrer.',
-    );
     expect(print?.disabled).toBe(true);
     expect(status?.getAttribute('aria-live')).toBe('polite');
 
@@ -107,6 +109,35 @@ describe('mountApp', () => {
     expect(mocks.parseEml).toHaveBeenCalledOnce();
     expect(mocks.preparePreview).toHaveBeenCalledWith(message);
     expect(root.querySelector('iframe')!.srcdoc).toContain('<p>blocked</p>');
+  });
+
+  it('hides the combined upload overlay after a file is selected', async () => {
+    mocks.parseEml.mockResolvedValue(message);
+    mountApp(root);
+
+    const overlay = root.querySelector<HTMLElement>('.preview-upload')!;
+    expect(overlay.hidden).toBe(false);
+
+    select(root, file());
+    expect(overlay.hidden).toBe(true);
+    await flush();
+
+    expect(overlay.hidden).toBe(true);
+  });
+
+  it('reads a file dropped on the combined upload overlay', async () => {
+    const selected = file();
+    mocks.parseEml.mockResolvedValue(message);
+    mountApp(root);
+
+    const files = { 0: selected, length: 1, item: (index: number) => (index === 0 ? selected : null) } as unknown as FileList;
+    const event = new Event('drop', { cancelable: true });
+    Object.defineProperty(event, 'dataTransfer', { value: { files } });
+    root.querySelector<HTMLElement>('.preview-upload')!.dispatchEvent(event);
+    await flush();
+
+    expect(event.defaultPrevented).toBe(true);
+    expect(mocks.parseEml).toHaveBeenCalledOnce();
   });
 
   it('does not let a stale parse replace a newer selection', async () => {

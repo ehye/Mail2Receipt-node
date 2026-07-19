@@ -112,7 +112,9 @@ function externalHttpRequests(page: Page): Request[] {
 }
 
 async function uploadAndWaitForPreview(page: Page, eml: string, text: string): Promise<FrameLocator> {
-  await page.getByLabel('Choose email').setInputFiles(emailFile(eml));
+  await page
+    .locator('label[aria-label="Choose or drop an HTML email"] input[name="email-file"]')
+    .setInputFiles(emailFile(eml));
 
   const frame = page.frameLocator('iframe');
   await expect(frame.locator('body')).toContainText(text);
@@ -121,10 +123,80 @@ async function uploadAndWaitForPreview(page: Page, eml: string, text: string): P
   return frame;
 }
 
+test('uses the preview sheet as the upload overlay', async ({ page }) => {
+  await page.goto('/');
+
+  const overlay = page.locator('.preview-upload');
+  const input = overlay.locator('input[type="file"]');
+
+  await expect(overlay).toHaveCSS('position', 'absolute');
+  await expect(overlay).toHaveCSS('z-index', '1');
+  await expect(input).toHaveCSS('position', 'absolute');
+  await expect(input).toHaveCSS('width', '1px');
+  await expect(input).toHaveCSS('height', '1px');
+  await expect(input).toHaveCSS('overflow', 'clip');
+});
+
+test('uses a desktop control rail and stacks the workspace on narrow screens', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.goto('/');
+
+  const title = page.locator('.review-title');
+  const controls = page.locator('.review-controls');
+  const status = page.locator('.review-status');
+  const sheet = page.locator('.preview-sheet');
+  const desktopTitle = await title.boundingBox();
+  const desktopControls = await controls.boundingBox();
+  const desktopStatus = await status.boundingBox();
+  const desktopSheet = await sheet.boundingBox();
+
+  expect(desktopTitle).not.toBeNull();
+  expect(desktopControls).not.toBeNull();
+  expect(desktopStatus).not.toBeNull();
+  expect(desktopSheet).not.toBeNull();
+  expect(desktopSheet!.x).toBeGreaterThan(desktopControls!.x);
+  expect(desktopTitle!.y).toBe(desktopSheet!.y);
+  expect(desktopControls!.y).toBeGreaterThan(desktopTitle!.y);
+  expect(desktopStatus!.y).toBeGreaterThan(desktopControls!.y);
+  expect(desktopSheet!.width / desktopSheet!.height).toBeCloseTo(148 / 210, 3);
+  await expect(controls).toHaveCSS('flex-direction', 'column');
+
+  await page.setViewportSize({ width: 600, height: 900 });
+
+  const mobileShell = await page.locator('.review-shell').boundingBox();
+  const mobileTitle = await title.boundingBox();
+  const mobileControls = await controls.boundingBox();
+  const mobileStatus = await status.boundingBox();
+  const mobileSheet = await sheet.boundingBox();
+
+  expect(mobileShell).not.toBeNull();
+  expect(mobileTitle).not.toBeNull();
+  expect(mobileControls).not.toBeNull();
+  expect(mobileStatus).not.toBeNull();
+  expect(mobileSheet).not.toBeNull();
+  expect(mobileControls!.y).toBeGreaterThan(mobileTitle!.y);
+  expect(mobileStatus!.y).toBeGreaterThan(mobileControls!.y);
+  expect(mobileSheet!.y).toBeGreaterThan(mobileStatus!.y);
+  expect(mobileSheet!.x).toBe(mobileShell!.x);
+  expect(mobileSheet!.width).toBe(mobileShell!.width);
+  expect(mobileSheet!.width / mobileSheet!.height).toBeCloseTo(148 / 210, 3);
+  await expect(controls).toHaveCSS('flex-direction', 'row');
+});
+
+test('caps the desktop preview sheet at its configured CSS width on high-resolution screens', async ({ page }) => {
+  await page.setViewportSize({ width: 3840, height: 2160 });
+  await page.goto('/');
+
+  const sheet = await page.locator('.preview-sheet').boundingBox();
+
+  expect(sheet).not.toBeNull();
+  expect(sheet!.width).toBeCloseTo((187 * 96) / 25.4, 1);
+  expect(sheet!.width / sheet!.height).toBeCloseTo(148 / 210, 3);
+});
+
 test('remote content fetches each stylesheet once and keeps all approved requests private', async ({ page }) => {
   await page.goto('/');
   const requests = externalHttpRequests(page);
-  await expect(page.getByText('Direct and stylesheet-derived requests use no-referrer.')).toBeVisible();
   let dialogMessage: string | undefined;
   page.on('dialog', (dialog) => {
     dialogMessage = dialog.message();
@@ -215,7 +287,9 @@ test('remote content consent blocks HTTP stylesheet font, image, and import depe
   await page.route(httpFontUrl, (route) => route.fulfill({ contentType: 'font/woff2', body: Buffer.from('fixture-font') }));
   await page.route(httpStylesheetImportUrl, (route) => route.fulfill({ contentType: 'text/css', body: '' }));
 
-  await page.getByLabel('Choose email').setInputFiles(emailFile(stylesheetHttpDependenciesEmail));
+  await page
+    .locator('label[aria-label="Choose or drop an HTML email"] input[name="email-file"]')
+    .setInputFiles(emailFile(stylesheetHttpDependenciesEmail));
   const frame = page.frameLocator('iframe');
   await expect(frame.locator('body')).toContainText('Stylesheet HTTP dependency fixture');
 
@@ -318,8 +392,10 @@ test('preserves a source body font family', async ({ page }) => {
 test('renders hostile HTML in a sandboxed iframe without active or navigational content', async ({ page }) => {
   await page.goto('/');
   await expect(page.getByRole('button', { name: 'Print' })).toBeDisabled();
+  await expect(page.locator('label[aria-label="Choose or drop an HTML email"]')).toBeVisible();
 
   const frame = await uploadAndWaitForPreview(page, hostileEmail, 'Hostile fixture');
+  await expect(page.locator('label[aria-label="Choose or drop an HTML email"]')).toBeHidden();
   const documentHtml = await frame.locator('html').evaluate((element) => element.outerHTML);
 
   await expect(page.locator('iframe')).toHaveAttribute('sandbox', 'allow-same-origin allow-modals');
@@ -333,7 +409,9 @@ test('renders hostile HTML in a sandboxed iframe without active or navigational 
 
 test('reports text-only input with generic copy that excludes email content', async ({ page }) => {
   await page.goto('/');
-  await page.getByLabel('Choose email').setInputFiles(emailFile(textOnlyEmail));
+  await page
+    .locator('label[aria-label="Choose or drop an HTML email"] input[name="email-file"]')
+    .setInputFiles(emailFile(textOnlyEmail));
 
   await expect(page.getByRole('status')).toHaveText('Unable to prepare this email for preview.');
   await expect(page.locator('body')).not.toContainText(privateText);

@@ -14,31 +14,40 @@ input { font: inherit; }
 
 .review-shell {
   display: grid;
-  gap: 1rem;
-  width: min(100% - 2rem, 62rem);
+  grid-template-columns: minmax(15rem, 19rem) minmax(0, 1fr);
+  grid-template-areas:
+    "title preview"
+    "controls preview"
+    "status preview";
+  align-items: start;
+  gap: 1rem 2rem;
+  width: min(100% - 4rem, 90rem);
+  min-height: 100dvh;
   margin: 0 auto;
   padding: 2rem 0;
 }
 
 .review-title {
+  grid-area: title;
   margin: 0;
   font-size: clamp(1.5rem, 3vw, 2rem);
   letter-spacing: -0.04em;
 }
 
-.file-picker,
-.drop-target {
+.preview-upload {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
   display: grid;
   place-items: center;
-  min-height: 4.5rem;
-  border: 1px dashed #74867c;
-  border-radius: 0.65rem;
-  background: #f8faf8;
+  border: 2px dashed #74867c;
+  background: rgb(248 250 248 / 94%);
   color: #294236;
   cursor: pointer;
+  text-align: center;
 }
 
-.file-picker input {
+.preview-upload input {
   position: absolute;
   inline-size: 1px;
   block-size: 1px;
@@ -47,13 +56,13 @@ input { font: inherit; }
   white-space: nowrap;
 }
 
-.file-picker:focus-within { outline: 3px solid #8ab19a; outline-offset: 3px; }
+.preview-upload:focus-within { outline: 3px solid #8ab19a; outline-offset: -5px; }
 
-.drop-target { color: #53665b; }
+.preview-upload[hidden] { display: none; }
 
-.review-status { min-height: 1.5rem; margin: 0; color: #3d5046; }
+.review-status { grid-area: status; min-height: 1.5rem; margin: 0; color: #3d5046; }
 
-.review-controls { display: flex; flex-wrap: wrap; gap: 0.75rem; }
+.review-controls { grid-area: controls; display: flex; flex-direction: column; align-items: stretch; gap: 0.75rem; }
 
 .review-controls button {
   min-height: 2.75rem;
@@ -82,10 +91,12 @@ input { font: inherit; }
 .remote-content-toggle:has(input:disabled) { color: #64736a; }
 
 .preview-sheet {
-  width: min(100%, 42rem);
+  grid-area: preview;
+  position: relative;
+  width: min(100%, 187mm);
   aspect-ratio: 148 / 210;
-  margin: 0 auto;
-  overflow: auto;
+  margin: 0;
+  overflow: hidden;
   border: 1px solid #bcc5bf;
   background: #fff;
   box-shadow: 0 0.7rem 2rem rgb(23 32 28 / 15%);
@@ -99,8 +110,20 @@ input { font: inherit; }
   background: #fff;
 }
 
-@media (max-width: 35rem) {
-  .review-shell { width: min(100% - 1rem, 62rem); padding-block: 1rem; }
+@media (max-width: 48rem) {
+  .review-shell {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "title"
+      "controls"
+      "status"
+      "preview";
+    width: min(100% - 1rem, 62rem);
+    min-height: 0;
+    padding-block: 1rem;
+  }
+
+  .review-controls { flex-direction: row; flex-wrap: wrap; }
   .review-controls button { flex: 1 1 12rem; }
-  .preview-sheet { width: 100%; }
+  .preview-sheet { width: 100%; margin: 0 auto; }
 }

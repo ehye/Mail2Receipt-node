@@ -4,3 +4,5 @@ coverage/
 playwright-report/
 test-results/
 docs/
+.worktrees/
+.superpowers/

@@ -366,6 +366,16 @@ describe('preparePreview', () => {
 });
 
 describe('buildPreviewDocument', () => {
+  it('declares an A5 portrait page with 10mm print margins', () => {
+    const preview = preparePreview(message('<p>Receipt</p>'));
+
+    for (const allowRemoteContent of [false, true]) {
+      expect(buildPreviewDocument(preview, allowRemoteContent)).toContain(
+        '@page { size: A5 portrait; margin: 10mm; }',
+      );
+    }
+  });
+
   it('keeps deferred remote sources inert in the blocked document', () => {
     const preview = preparePreview(message('<img src="https://images.example.test/logo.png"><img src="cid:logo-png">'));
     const blocked = buildPreviewDocument(preview, false);
