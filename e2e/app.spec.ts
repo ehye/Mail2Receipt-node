@@ -137,46 +137,35 @@ test('uses the preview sheet as the upload overlay', async ({ page }) => {
   await expect(input).toHaveCSS('overflow', 'clip');
 });
 
-test('uses a desktop control rail and stacks the workspace on narrow screens', async ({ page }) => {
-  await page.setViewportSize({ width: 1280, height: 900 });
+test('centers the desktop preview vertically and stacks the workspace on narrow screens', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 1200 });
   await page.goto('/');
 
-  const title = page.locator('.review-title');
   const controls = page.locator('.review-controls');
-  const status = page.locator('.review-status');
   const sheet = page.locator('.preview-sheet');
-  const desktopTitle = await title.boundingBox();
   const desktopControls = await controls.boundingBox();
-  const desktopStatus = await status.boundingBox();
   const desktopSheet = await sheet.boundingBox();
 
-  expect(desktopTitle).not.toBeNull();
   expect(desktopControls).not.toBeNull();
-  expect(desktopStatus).not.toBeNull();
   expect(desktopSheet).not.toBeNull();
   expect(desktopSheet!.x).toBeGreaterThan(desktopControls!.x);
-  expect(desktopTitle!.y).toBe(desktopSheet!.y);
-  expect(desktopControls!.y).toBeGreaterThan(desktopTitle!.y);
-  expect(desktopStatus!.y).toBeGreaterThan(desktopControls!.y);
+  expect(desktopControls!.y).toBe(desktopSheet!.y);
+  expect(desktopSheet!.y).toBeCloseTo(1200 - desktopSheet!.y - desktopSheet!.height, 0);
   expect(desktopSheet!.width / desktopSheet!.height).toBeCloseTo(148 / 210, 3);
   await expect(controls).toHaveCSS('flex-direction', 'column');
+  await expect(page.locator('h1')).toHaveCount(0);
+  await expect(page.locator('[role="status"]')).toHaveCount(0);
 
   await page.setViewportSize({ width: 600, height: 900 });
 
   const mobileShell = await page.locator('.review-shell').boundingBox();
-  const mobileTitle = await title.boundingBox();
   const mobileControls = await controls.boundingBox();
-  const mobileStatus = await status.boundingBox();
   const mobileSheet = await sheet.boundingBox();
 
   expect(mobileShell).not.toBeNull();
-  expect(mobileTitle).not.toBeNull();
   expect(mobileControls).not.toBeNull();
-  expect(mobileStatus).not.toBeNull();
   expect(mobileSheet).not.toBeNull();
-  expect(mobileControls!.y).toBeGreaterThan(mobileTitle!.y);
-  expect(mobileStatus!.y).toBeGreaterThan(mobileControls!.y);
-  expect(mobileSheet!.y).toBeGreaterThan(mobileStatus!.y);
+  expect(mobileSheet!.y).toBeGreaterThan(mobileControls!.y);
   expect(mobileSheet!.x).toBe(mobileShell!.x);
   expect(mobileSheet!.width).toBe(mobileShell!.width);
   expect(mobileSheet!.width / mobileSheet!.height).toBeCloseTo(148 / 210, 3);
@@ -413,9 +402,30 @@ test('reports text-only input with generic copy that excludes email content', as
     .locator('label[aria-label="Choose or drop an HTML email"] input[name="email-file"]')
     .setInputFiles(emailFile(textOnlyEmail));
 
-  await expect(page.getByRole('status')).toHaveText('Unable to prepare this email for preview.');
+  await expect(page.locator('[role="status"]')).toHaveCount(0);
+  const errorOverlay = page.locator('.preview-upload-error');
+  await expect(errorOverlay).toHaveText('Unable to prepare this email for preview.');
   await expect(page.locator('body')).not.toContainText(privateText);
   await expect(page.getByRole('button', { name: 'Print' })).toBeDisabled();
+
+  const fileChooserPromise = page.waitForEvent('filechooser');
+  await errorOverlay.click();
+  const fileChooser = await fileChooserPromise;
+  await fileChooser.setFiles(emailFile(mixedEmail));
+  await expect(page.locator('iframe').contentFrame().locator('body')).toContainText('Mixed receipt fixture');
+  await expect(page.getByRole('button', { name: 'Choose another email' })).toBeVisible();
+});
+
+test('chooses another email after a successful preview', async ({ page }) => {
+  await page.goto('/');
+  await uploadAndWaitForPreview(page, mixedEmail, 'Mixed receipt fixture');
+
+  const fileChooserPromise = page.waitForEvent('filechooser');
+  await page.getByRole('button', { name: 'Choose another email' }).click();
+  const fileChooser = await fileChooserPromise;
+  await fileChooser.setFiles(emailFile(replacementEmail));
+
+  await expect(page.locator('iframe').contentFrame().locator('body')).toContainText('Replacement receipt fixture');
 });
 
 test('prints the active preview iframe after it has loaded', async ({ page }) => {
