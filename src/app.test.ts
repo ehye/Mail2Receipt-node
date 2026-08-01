@@ -72,14 +72,15 @@ describe('mountApp', () => {
 
   afterEach(() => vi.unstubAllGlobals());
 
-  it('creates a private review shell with disabled actions', () => {
+  it('creates a private review shell without heading or status copy', () => {
     mountApp(root);
 
     const input = root.querySelector<HTMLInputElement>('input[type="file"]');
     const uploadOverlay = root.querySelector<HTMLElement>('.preview-upload');
     const remote = root.querySelector<HTMLInputElement>('input[name="load-remote-content"]');
     const print = root.querySelector<HTMLButtonElement>('button[name="print"]');
-    const status = root.querySelector<HTMLElement>('[role="status"]');
+    expect(root.querySelector('h1')).toBeNull();
+    expect(root.querySelector('[role="status"]')).toBeNull();
     expect(input?.getAttribute('accept')).toBe('.eml,message/rfc822');
     expect(uploadOverlay?.getAttribute('aria-label')).toBe('Choose or drop an HTML email');
     expect(input?.closest('.preview-upload')).toBe(uploadOverlay);
@@ -89,8 +90,6 @@ describe('mountApp', () => {
     expect(remote?.checked).toBe(false);
     expect(remote?.disabled).toBe(true);
     expect(print?.disabled).toBe(true);
-    expect(status?.getAttribute('aria-live')).toBe('polite');
-
     const frame = root.querySelector<HTMLIFrameElement>('iframe')!;
     expect(frame.getAttribute('sandbox')).toBe('allow-same-origin allow-modals');
     expect(frame.getAttribute('referrerpolicy')).toBe('no-referrer');
@@ -177,14 +176,14 @@ describe('mountApp', () => {
     expect(mocks.preparePreview).toHaveBeenCalledTimes(1);
   });
 
-  it('reports a generic parsing failure without exposing message data', async () => {
+  it('keeps parsing failures out of the control rail and excludes message data', async () => {
     mocks.parseEml.mockRejectedValue(new Error('subject: confidential receipt'));
     mountApp(root);
 
     select(root, file());
     await flush();
 
-    expect(root.querySelector('[role="status"]')?.textContent).toBe('Unable to prepare this email for preview.');
+    expect(root.querySelector('[role="status"]')).toBeNull();
     expect(root.textContent).not.toContain('confidential receipt');
     expect(root.textContent).not.toContain('private-email.eml');
   });

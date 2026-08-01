@@ -26,11 +26,9 @@ export function mountApp(root: HTMLDivElement): void {
     activeDocumentSession: 0,
   };
   const shell = element('main', 'review-shell');
-  const heading = element('h1', 'review-title');
   const input = document.createElement('input');
   const uploadOverlay = document.createElement('label');
   const uploadText = document.createElement('span');
-  const status = element('p', 'review-status');
   const controls = element('div', 'review-controls');
   const remoteContent = document.createElement('input');
   const remoteContentLabel = document.createElement('label');
@@ -39,7 +37,6 @@ export function mountApp(root: HTMLDivElement): void {
   const sheet = element('div', 'preview-sheet');
   const frame = document.createElement('iframe');
 
-  heading.textContent = 'Email print preview';
   input.type = 'file';
   input.accept = '.eml,message/rfc822';
   input.name = 'email-file';
@@ -48,9 +45,6 @@ export function mountApp(root: HTMLDivElement): void {
   uploadOverlay.setAttribute('aria-label', 'Choose or drop an HTML email');
   uploadText.textContent = 'Choose or drop an HTML email';
   uploadOverlay.append(uploadText, input);
-  status.setAttribute('role', 'status');
-  status.setAttribute('aria-live', 'polite');
-  status.textContent = 'Choose one HTML email to begin.';
   remoteContent.type = 'checkbox';
   remoteContent.name = 'load-remote-content';
   remoteContent.disabled = true;
@@ -73,7 +67,7 @@ export function mountApp(root: HTMLDivElement): void {
 
   controls.append(remoteContentLabel, reuploadButton, printButton);
   sheet.append(uploadOverlay, frame);
-  shell.append(heading, controls, status, sheet);
+  shell.append(controls, sheet);
   root.replaceChildren(shell);
 
   input.addEventListener('change', () => {
@@ -149,7 +143,6 @@ export function mountApp(root: HTMLDivElement): void {
     assignFrameDocument('');
     remoteContent.disabled = true;
     printButton.disabled = true;
-    status.textContent = 'Preparing email preview.';
 
     void prepareFile(file, session);
   }
@@ -177,7 +170,6 @@ export function mountApp(root: HTMLDivElement): void {
       remoteContent.disabled = preview.remoteResourceCount === 0;
       printButton.disabled = true;
       reuploadButton.hidden = false;
-      status.textContent = '';
     } catch {
       if (state.session !== session) {
         return;
@@ -192,7 +184,6 @@ export function mountApp(root: HTMLDivElement): void {
       uploadOverlay.setAttribute('aria-label', parsingError);
       uploadOverlay.classList.add('preview-upload-error');
       uploadOverlay.hidden = false;
-      status.textContent = parsingError;
     }
   }
 
