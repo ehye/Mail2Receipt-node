@@ -414,8 +414,29 @@ test('reports text-only input with generic copy that excludes email content', as
     .setInputFiles(emailFile(textOnlyEmail));
 
   await expect(page.getByRole('status')).toHaveText('Unable to prepare this email for preview.');
+  const errorOverlay = page.locator('.preview-upload-error');
+  await expect(errorOverlay).toHaveText('Unable to prepare this email for preview.');
   await expect(page.locator('body')).not.toContainText(privateText);
   await expect(page.getByRole('button', { name: 'Print' })).toBeDisabled();
+
+  const fileChooserPromise = page.waitForEvent('filechooser');
+  await errorOverlay.click();
+  const fileChooser = await fileChooserPromise;
+  await fileChooser.setFiles(emailFile(mixedEmail));
+  await expect(page.locator('iframe').contentFrame().locator('body')).toContainText('Mixed receipt fixture');
+  await expect(page.getByRole('button', { name: 'Choose another email' })).toBeVisible();
+});
+
+test('chooses another email after a successful preview', async ({ page }) => {
+  await page.goto('/');
+  await uploadAndWaitForPreview(page, mixedEmail, 'Mixed receipt fixture');
+
+  const fileChooserPromise = page.waitForEvent('filechooser');
+  await page.getByRole('button', { name: 'Choose another email' }).click();
+  const fileChooser = await fileChooserPromise;
+  await fileChooser.setFiles(emailFile(replacementEmail));
+
+  await expect(page.locator('iframe').contentFrame().locator('body')).toContainText('Replacement receipt fixture');
 });
 
 test('prints the active preview iframe after it has loaded', async ({ page }) => {

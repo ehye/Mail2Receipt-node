@@ -125,6 +125,26 @@ describe('mountApp', () => {
     expect(overlay.hidden).toBe(true);
   });
 
+  it('offers the existing file picker after a preview is prepared', async () => {
+    mocks.parseEml.mockResolvedValue(message);
+    mountApp(root);
+
+    const input = root.querySelector<HTMLInputElement>('input[type="file"]')!;
+    const reupload = root.querySelector<HTMLButtonElement>('button[name="reupload"]')!;
+    const click = vi.spyOn(input, 'click');
+    expect(reupload.hidden).toBe(true);
+
+    select(root, file());
+    await flush();
+    expect(reupload.hidden).toBe(false);
+
+    reupload.click();
+    expect(click).toHaveBeenCalledOnce();
+
+    select(root, file());
+    expect(reupload.hidden).toBe(true);
+  });
+
   it('reads a file dropped on the combined upload overlay', async () => {
     const selected = file();
     mocks.parseEml.mockResolvedValue(message);
@@ -167,6 +187,22 @@ describe('mountApp', () => {
     expect(root.querySelector('[role="status"]')?.textContent).toBe('Unable to prepare this email for preview.');
     expect(root.textContent).not.toContain('confidential receipt');
     expect(root.textContent).not.toContain('private-email.eml');
+  });
+
+  it('shows a clickable preparation error in the preview sheet', async () => {
+    mocks.parseEml.mockRejectedValue(new Error('subject: confidential receipt'));
+    mountApp(root);
+
+    select(root, file());
+    await flush();
+
+    const overlay = root.querySelector<HTMLLabelElement>('.preview-upload')!;
+    expect(overlay.hidden).toBe(false);
+    expect(overlay.classList.contains('preview-upload-error')).toBe(true);
+    expect(overlay.textContent).toBe('Unable to prepare this email for preview.');
+    expect(overlay.getAttribute('aria-label')).toBe('Unable to prepare this email for preview.');
+    expect(overlay.querySelector('input[type="file"]')).not.toBeNull();
+    expect(root.querySelector<HTMLButtonElement>('button[name="reupload"]')?.hidden).toBe(true);
   });
 
   it('keeps remote content consent through later selections', async () => {

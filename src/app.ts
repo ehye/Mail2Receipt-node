@@ -29,11 +29,13 @@ export function mountApp(root: HTMLDivElement): void {
   const heading = element('h1', 'review-title');
   const input = document.createElement('input');
   const uploadOverlay = document.createElement('label');
+  const uploadText = document.createElement('span');
   const status = element('p', 'review-status');
   const controls = element('div', 'review-controls');
   const remoteContent = document.createElement('input');
   const remoteContentLabel = document.createElement('label');
   const printButton = document.createElement('button');
+  const reuploadButton = document.createElement('button');
   const sheet = element('div', 'preview-sheet');
   const frame = document.createElement('iframe');
 
@@ -44,7 +46,8 @@ export function mountApp(root: HTMLDivElement): void {
   uploadOverlay.className = 'preview-upload';
   uploadOverlay.htmlFor = input.id = 'email-file';
   uploadOverlay.setAttribute('aria-label', 'Choose or drop an HTML email');
-  uploadOverlay.append('Choose or drop an HTML email', input);
+  uploadText.textContent = 'Choose or drop an HTML email';
+  uploadOverlay.append(uploadText, input);
   status.setAttribute('role', 'status');
   status.setAttribute('aria-live', 'polite');
   status.textContent = 'Choose one HTML email to begin.';
@@ -60,11 +63,15 @@ export function mountApp(root: HTMLDivElement): void {
   printButton.name = 'print';
   printButton.textContent = 'Print';
   printButton.disabled = true;
+  reuploadButton.type = 'button';
+  reuploadButton.name = 'reupload';
+  reuploadButton.textContent = 'Choose another email';
+  reuploadButton.hidden = true;
   frame.title = 'Sanitized email preview';
   frame.setAttribute('sandbox', 'allow-same-origin allow-modals');
   frame.setAttribute('referrerpolicy', 'no-referrer');
 
-  controls.append(remoteContentLabel, printButton);
+  controls.append(remoteContentLabel, reuploadButton, printButton);
   sheet.append(uploadOverlay, frame);
   shell.append(heading, controls, status, sheet);
   root.replaceChildren(shell);
@@ -128,9 +135,15 @@ export function mountApp(root: HTMLDivElement): void {
     }
   });
 
+  reuploadButton.addEventListener('click', () => input.click());
+
   function selectFile(file: File): void {
     const session = ++state.session;
     uploadOverlay.hidden = true;
+    uploadOverlay.classList.remove('preview-upload-error');
+    uploadOverlay.setAttribute('aria-label', 'Choose or drop an HTML email');
+    uploadText.textContent = 'Choose or drop an HTML email';
+    reuploadButton.hidden = true;
     delete state.preview;
     state.frameReady = false;
     assignFrameDocument('');
@@ -163,6 +176,7 @@ export function mountApp(root: HTMLDivElement): void {
       }
       remoteContent.disabled = preview.remoteResourceCount === 0;
       printButton.disabled = true;
+      reuploadButton.hidden = false;
       status.textContent = '';
     } catch {
       if (state.session !== session) {
@@ -174,6 +188,10 @@ export function mountApp(root: HTMLDivElement): void {
       assignFrameDocument('');
       remoteContent.disabled = true;
       printButton.disabled = true;
+      uploadText.textContent = parsingError;
+      uploadOverlay.setAttribute('aria-label', parsingError);
+      uploadOverlay.classList.add('preview-upload-error');
+      uploadOverlay.hidden = false;
       status.textContent = parsingError;
     }
   }
