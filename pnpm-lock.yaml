@@ -12,8 +12,8 @@ importers:
         specifier: ^3.3.0
         version: 3.4.12
       postal-mime:
-        specifier: ^2.7.5
-        version: 2.7.5
+        specifier: ^3.0.0
+        version: 3.0.0
     devDependencies:
       '@eslint/js':
         specifier: ^10.0.1
@@ -915,8 +915,8 @@ packages:
     engines: {node: '>=20'}
     hasBin: true
 
-  postal-mime@2.7.5:
-    resolution: {integrity: sha512-GNEXKvWFQnbgO5NlrGzVa0FmWzBZ24PersAWErttSg1Hjpf0ATxTwS5DOMGaOpTG6bUh5cTr7xi0jAD942wCJA==}
+  postal-mime@3.0.0:
+    resolution: {integrity: sha512-Z4a9ar2Bv3YpK3IXag+Yda30k7bMZfpRuUGyqtHnZ2pjHG8Bl62EhZIk4n1dzv00gfzP9g+94e9kd8+XmjVWLA==}
 
   postcss@8.5.19:
     resolution: {integrity: sha512-Mz8SaolMd8nB+G13WkORcxQKHZ/NE4xXevtkJHVuG+guo9/wYKlIMTKAqGdEmYOXR2ijPjTYNHssizdaVSUNdQ==}
@@ -1918,7 +1918,7 @@ snapshots:
     optionalDependencies:
       fsevents: 2.3.2
 
-  postal-mime@2.7.5: {}
+  postal-mime@3.0.0: {}
 
   postcss@8.5.19:
     dependencies:
