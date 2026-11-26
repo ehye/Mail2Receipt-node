@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { ParsedMessage } from './mail/types';
+import { MAX_EMAIL_BYTES, type ParsedMessage } from './mail/types';
 import type { PreparedPreview } from './preview/policy';
 
 const mocks = vi.hoisted(() => ({
@@ -35,9 +35,7 @@ function select(root: HTMLDivElement, selected: File): void {
 }
 
 async function flush(): Promise<void> {
-  await Promise.resolve();
-  await Promise.resolve();
-  await Promise.resolve();
+  await new Promise((resolve) => setTimeout(resolve, 0));
 }
 
 function dispatchFrameLoad(frame: HTMLIFrameElement, source: string): void {
@@ -94,6 +92,20 @@ describe('mountApp', () => {
     expect(frame.getAttribute('sandbox')).toBe('allow-same-origin allow-modals');
     expect(frame.getAttribute('referrerpolicy')).toBe('no-referrer');
     expect(frame.getAttribute('sandbox')).not.toContain('allow-scripts');
+  });
+
+  it.each(['text/html', 'text/plain'])('rejects oversized UTF-8 paste data (%s) before processing', async (type) => {
+    mountApp(root);
+    const content = 'é'.repeat(MAX_EMAIL_BYTES / 2 + 1);
+    const event = new Event('paste', { cancelable: true });
+    Object.defineProperty(event, 'clipboardData', { value: { getData: (format: string) => format === type ? content : '' } });
+    root.querySelector('textarea')!.dispatchEvent(event);
+    await flush();
+
+    expect(event.defaultPrevented).toBe(true);
+    expect(mocks.parseEml).not.toHaveBeenCalled();
+    expect(mocks.preparePreview).not.toHaveBeenCalled();
+    expect(root.querySelector('.preview-upload-error')?.textContent).toBe('Unable to prepare this email for preview.');
   });
 
   it('reads and parses an accepted selection exactly once', async () => {

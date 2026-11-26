@@ -1,4 +1,5 @@
 import { parseEml } from './mail/parse';
+import { MAX_EMAIL_BYTES, type ParsedMessage } from './mail/types';
 import { preparePreview, prepareRemoteStylesheets, type PreparedPreview } from './preview/policy';
 import { buildPreviewDocument } from './preview/preview-document';
 
@@ -16,6 +17,19 @@ type ReviewState = {
 const parsingError = 'Unable to prepare this email for preview.';
 const documentTokenName = 'mail2receipt-document-token';
 
+function readClipboard(data: DataTransfer | null): ParsedMessage | Promise<ParsedMessage> {
+  const html = data?.getData('text/html') ?? '';
+  const content = html || data?.getData('text/plain');
+  if (!content || content.length > MAX_EMAIL_BYTES || !content.trim()) {
+    throw new Error('invalid-email');
+  }
+
+  const bytes = new TextEncoder().encode(content);
+  if (bytes.byteLength > MAX_EMAIL_BYTES) throw new Error('email-too-large');
+
+  return html ? { html, cidImages: [] } : parseEml(bytes.buffer);
+}
+
 export function mountApp(root: HTMLDivElement): void {
   const state: ReviewState = {
     session: 0,
@@ -30,6 +44,8 @@ export function mountApp(root: HTMLDivElement): void {
   const uploadOverlay = document.createElement('label');
   const uploadText = document.createElement('span');
   const controls = element('div', 'review-controls');
+  const pasteLabel = document.createElement('label');
+  const pasteArea = document.createElement('textarea');
   const remoteContent = document.createElement('input');
   const remoteContentLabel = document.createElement('label');
   const printButton = document.createElement('button');
@@ -45,6 +61,14 @@ export function mountApp(root: HTMLDivElement): void {
   uploadOverlay.setAttribute('aria-label', 'Choose or drop an HTML email');
   uploadText.textContent = 'Choose or drop an HTML email';
   uploadOverlay.append(uploadText, input);
+  pasteLabel.className = 'paste-email';
+  pasteLabel.textContent = 'Paste an email';
+  pasteArea.placeholder = 'Paste the formatted email body or .eml source here';
+  pasteArea.rows = 2;
+  pasteArea.maxLength = 0;
+  pasteArea.autocomplete = 'off';
+  pasteArea.spellcheck = false;
+  pasteLabel.append(pasteArea);
   remoteContent.type = 'checkbox';
   remoteContent.name = 'load-remote-content';
   remoteContent.disabled = true;
@@ -65,10 +89,15 @@ export function mountApp(root: HTMLDivElement): void {
   frame.setAttribute('sandbox', 'allow-same-origin allow-modals');
   frame.setAttribute('referrerpolicy', 'no-referrer');
 
-  controls.append(remoteContentLabel, reuploadButton, printButton);
+  controls.append(pasteLabel, remoteContentLabel, reuploadButton, printButton);
   sheet.append(uploadOverlay, frame);
   shell.append(controls, sheet);
   root.replaceChildren(shell);
+
+  pasteArea.addEventListener('paste', (event) => {
+    event.preventDefault();
+    void importEmail(() => readClipboard(event.clipboardData));
+  });
 
   input.addEventListener('change', () => {
     const file = input.files?.item(0);
@@ -132,6 +161,10 @@ export function mountApp(root: HTMLDivElement): void {
   reuploadButton.addEventListener('click', () => input.click());
 
   function selectFile(file: File): void {
+    void importEmail(async () => parseEml(await file.arrayBuffer()));
+  }
+
+  async function importEmail(readMessage: () => ParsedMessage | Promise<ParsedMessage>): Promise<void> {
     const session = ++state.session;
     uploadOverlay.hidden = true;
     uploadOverlay.classList.remove('preview-upload-error');
@@ -144,12 +177,8 @@ export function mountApp(root: HTMLDivElement): void {
     remoteContent.disabled = true;
     printButton.disabled = true;
 
-    void prepareFile(file, session);
-  }
-
-  async function prepareFile(file: File, session: number): Promise<void> {
     try {
-      const message = await parseEml(await file.arrayBuffer());
+      const message = await readMessage();
 
       if (state.session !== session) {
         return;

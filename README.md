@@ -7,6 +7,8 @@
 
 A browser-only application for previewing and printing HTML emails.
 
+Choose or drop an `.eml` file, or copy the formatted body of an email and paste it into **Paste an email**. You can also paste raw `.eml` source that contains an HTML body. Paste again to replace the preview.
+
 ## Privacy
 
 - Emails stay in browser memory and are never uploaded or saved.
