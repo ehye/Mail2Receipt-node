@@ -96,6 +96,20 @@ function emailFile(eml: string) {
   return { name: 'fixture.eml', mimeType: 'message/rfc822', buffer: Buffer.from(eml) };
 }
 
+async function pasteEmail(page: Page, formats: Record<string, string>): Promise<void> {
+  const area = page.getByRole('textbox', { name: 'Paste an email' });
+  await area.focus();
+  await page.evaluate((formats) => {
+    document.addEventListener('copy', (event) => {
+      event.preventDefault();
+      for (const [type, content] of Object.entries(formats)) event.clipboardData!.setData(type, content);
+    }, { once: true });
+  }, formats);
+  await area.press('ControlOrMeta+c');
+  await area.press('ControlOrMeta+v');
+  await expect(area).toHaveValue('');
+}
+
 function externalHttpRequests(page: Page): Request[] {
   const requests: Request[] = [];
   const applicationOrigin = new URL(page.url()).origin;
@@ -122,6 +136,33 @@ async function uploadAndWaitForPreview(page: Page, eml: string, text: string): P
 
   return frame;
 }
+
+test('previews sanitized formatted clipboard content, then replaces it with parsed .eml source', async ({ page }) => {
+  await page.goto('/');
+  const requests = externalHttpRequests(page);
+  await pasteEmail(page, {
+    'text/html': `<strong>Pasted receipt</strong><a href="https://example.test/">Link</a><img src="${receiptImage}" alt="Receipt">`,
+    'text/plain': 'Plain fallback',
+  });
+  const frame = page.frameLocator('iframe');
+  const print = page.getByRole('button', { name: 'Print' });
+  await expect(frame.locator('strong')).toHaveText('Pasted receipt');
+  await expect(frame.locator('[href], img[src]')).toHaveCount(0);
+  await expect(print).toBeEnabled();
+  await expect(page.getByRole('checkbox', { name: 'Load remote content' })).toBeEnabled();
+  expect(requests).toHaveLength(0);
+
+  await pasteEmail(page, { 'text/plain': mixedEmail });
+  await expect(frame.locator('body')).toContainText('Mixed receipt fixture');
+  await expect(frame.getByAltText('Logo')).toHaveAttribute('src', /^data:image\/png;base64,/);
+  await expect(frame.locator('body')).not.toContainText('Pasted receipt');
+  await expect(print).toBeEnabled();
+
+  await pasteEmail(page, { 'text/plain': textOnlyEmail });
+  await expect(page.locator('.preview-upload')).toHaveText('Unable to prepare this email for preview.');
+  await expect(print).toBeDisabled();
+  await expect(page.locator('main')).not.toContainText(privateText);
+});
 
 test('uses the preview sheet as the upload overlay', async ({ page }) => {
   await page.goto('/');
