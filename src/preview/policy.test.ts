@@ -86,10 +86,13 @@ describe('preparePreview', () => {
   });
 
   it('preserves a source body font family on the generated preview body', () => {
-    const preview = preparePreview(message('<body style="font-family: Verdana, Droid Sans"><p>Receipt</p></body>'));
+    const fontFamily = 'Verdana, Droid Sans';
+    const preview = preparePreview(message(`<body style="font-family: ${fontFamily}"><p>Receipt</p></body>`));
     const document = new DOMParser().parseFromString(buildPreviewDocument(preview, false), 'text/html');
 
-    expect(document.body.style.fontFamily).toBe('Verdana, "Droid Sans"');
+    const expected = document.createElement('span');
+    expected.style.fontFamily = fontFamily;
+    expect(document.body.style.fontFamily).toBe(expected.style.fontFamily);
   });
 
   it('defers a source body CSS resource until remote content is allowed', () => {
